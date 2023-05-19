@@ -17,7 +17,10 @@ const uint8_t STATE_MAIN_WORK = 4;
 
 uint8_t curState;
 
+
+
 LedBlink *led;
+
 
 WifiStation *wifiStation;
 WifiWebServer *webServer;
@@ -183,6 +186,7 @@ void loop() {
       break;
     }
     case STATE_MAIN_WORK: {
+//      delay(50);
       led->update( dt );
       bool hasWiFiCon = wifiStation->wifiCheckConnected( dt );
 
@@ -199,19 +203,4 @@ void loop() {
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

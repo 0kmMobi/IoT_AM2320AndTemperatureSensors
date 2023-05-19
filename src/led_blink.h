@@ -60,7 +60,6 @@ public:
   }
 
   void update(uint32_t frameTime) {
-    //Serial.printf("LED update (%u), %d\n", frameTime, active);
     if(!active)
       return;
 
@@ -70,7 +69,6 @@ public:
     for(int i = 0; i < numTasks; i ++) {
       Phase state = tasks[i];
       if( timer < countTime + state.duration ) {
-          // Serial.printf("  LED update( %u ): %d => %d\n", frameTime, pin, state.value);
           digitalWrite(pin, state.value);
           return;
       }

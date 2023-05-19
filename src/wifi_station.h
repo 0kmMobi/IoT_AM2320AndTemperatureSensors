@@ -41,11 +41,8 @@ class WifiStation {
       String pass = eepromStorage.pass;
 
       Serial.printf("\nConnecting to Wifi '%s': ", ssid.c_str());
-      // Buzzer *buzzer = new Buzzer(D2);
-      // buzzer->beep(2600, 200);
+
       WiFi.begin(ssid.c_str(), pass.c_str());
-      // buzzer->beep(1200, 200);
-      // delete buzzer;
 
       wifiConnectionCheckTimer = 0;
       wifiConnectionCheckAttempts = 0;

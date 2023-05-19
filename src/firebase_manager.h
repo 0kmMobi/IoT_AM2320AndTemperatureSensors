@@ -209,6 +209,7 @@ class FirebaseManager {
         Serial.printf("Set sensors names list to RTDB... %s\n", jsonSetResult ? "ok" : fbdo.errorReason().c_str());
         Serial.println();
     }
+
     void sendDS18B20SensorsDataToDB(String *arrSensorsAddr, float* arrTemperatures, uint8_t sensorsNumber)  {
         Serial.println(" Push DS18B20 sensors new data to DB.");
         if(sensorsNumber == 0) {
@@ -228,6 +229,7 @@ class FirebaseManager {
         Serial.printf("  Push data to RTDB ... %s\n\n", result ? "ok" : fbdo.errorReason().c_str());
     }
 
+
     void sendAM2320SensorDataToDB(float humidity, float temperature) {
         Serial.println(" Push AM2320 sensor new data to DB.");
         String path = DB_DEVICES_DATA + deviceMAC + DB_AM2320_VALUES;
@@ -242,9 +244,6 @@ class FirebaseManager {
         bool result = Firebase.RTDB.pushAsync(&fbdo, path, &json);
         Serial.printf("  Push data to RTDB ... %s\n\n", result ? "ok" : fbdo.errorReason().c_str());
     }
-
-
-
 
 
     void checkIfNeedSendPong() {
