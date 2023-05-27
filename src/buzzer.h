@@ -1,3 +1,5 @@
+#ifndef BUZZER_H
+#define BUZZER_H
 
 #include "Arduino.h"
 
@@ -16,3 +18,5 @@ class Buzzer {
       noTone(pin);
     }
 };
+
+#endif // BUZZER_H

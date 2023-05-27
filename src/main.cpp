@@ -6,6 +6,7 @@
 #include "eeprom_storage.h"
 #include "wifi_station.h"
 #include "firebase_manager.h"
+#include "sensors_manager_interface.h"
 #include "sensors_DS18B20_manager.h"
 #include "sensor_AM2320_manager.h"
 
@@ -17,17 +18,17 @@ const uint8_t STATE_MAIN_WORK = 4;
 
 uint8_t curState;
 
-
-
 LedBlink *led;
 
+SensorsDS18B20Manager_ *sensorsDS18B20;
+SensorAM2320Manager_ *sensorAM2320;
+int numSensManagers;
+ISensorsManager **sensManagers;
 
 WifiStation *wifiStation;
 WifiWebServer *webServer;
 
 FirebaseManager *firebaseManager;
-SensorsDS18B20Manager *sensorsDS18B20;
-SensorAM2320Manager *sensorAM2320;
 
 uint32_t mainLoopTimer;
 
@@ -97,14 +98,13 @@ void changeState(uint8_t newState) {
       firebaseManager = new FirebaseManager(mac);
       firebaseManager->sendDeviceInfo();
 
-      sensorAM2320 = new SensorAM2320Manager();
+      sensorAM2320 = new SensorAM2320Manager_();
+      sensorsDS18B20 = new SensorsDS18B20Manager_();
 
-      sensorsDS18B20 = new SensorsDS18B20Manager();
-      sensorsDS18B20->initOnWireDS18B20();
-      String *arrStrSensorsAddr = sensorsDS18B20->getSensorsAddresses();
-      uint8_t sensorsNumber = sensorsDS18B20->getSensorsNumber();
-      firebaseManager->sendSensorsList(arrStrSensorsAddr, sensorsNumber);
-      Serial.println("After init Sensors and firebase");
+      numSensManagers = 2;
+      sensManagers = new ISensorsManager* [numSensManagers];
+      sensManagers[0] = sensorsDS18B20;
+      sensManagers[1] = sensorAM2320;
 
       sensorsDataTimer = FREQ_MEASUREMENT_TIME_MSEC;
       break;
@@ -118,15 +118,28 @@ void updateSensorsDataAndSendToDB(uint32_t dt, bool hasWiFiCon) {
   sensorsDataTimer += dt;
   if(hasWiFiCon && sensorsDataTimer >= FREQ_MEASUREMENT_TIME_MSEC) {
     if (Firebase.ready()) {
-      // DS18B20
-      String *arrStrSensorsAddr = sensorsDS18B20->getSensorsAddresses();
-      float* arrTemperatures = sensorsDS18B20->getTemperatures();
-      uint8_t sensorsNumber = sensorsDS18B20->getSensorsNumber();
-      firebaseManager->sendDS18B20SensorsDataToDB(arrStrSensorsAddr, arrTemperatures, sensorsNumber);
 
-      // AM2320
-      if( sensorAM2320->tryToReadData() ) {
-        firebaseManager->sendAM2320SensorDataToDB(sensorAM2320->lastHum, sensorAM2320->lastTemp);
+      bool someListChanged = false;
+      int allSensors = 0;
+      for(int iMan = 0; iMan < numSensManagers; iMan ++) {
+        ISensorsManager* sensMan = sensManagers[iMan];
+        someListChanged |= sensMan->checkSensorsListChanged();
+        allSensors += sensMan->getNumSensors();
+      }
+
+      // The modified list of sensors must be sent to DB
+      if(someListChanged) {
+        firebaseManager->sendSensorsList(allSensors, sensManagers, numSensManagers);
+      }
+
+      bool resRead = false;
+      for(int iMan = 0; iMan < numSensManagers; iMan ++) {
+        ISensorsManager* sensMan = sensManagers[iMan];
+        resRead |= sensMan->tryToReadData();
+      }
+
+      if(resRead) {
+        firebaseManager->sendSensorsDataToDB(allSensors, sensManagers, numSensManagers);
       }
 
       sensorsDataTimer -= (sensorsDataTimer/FREQ_MEASUREMENT_TIME_MSEC)*FREQ_MEASUREMENT_TIME_MSEC;

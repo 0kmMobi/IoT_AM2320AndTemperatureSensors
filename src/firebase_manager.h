@@ -14,6 +14,7 @@
 //Provide the RTDB payload printing info and other helper functions.
 #include "addons/RTDBHelper.h"
 
+#include "sensors_manager_interface.h"
 #include "consts.h"
 
 
@@ -148,7 +149,7 @@ class FirebaseManager {
 
       initPingStream();
       Serial.println("Firebase Client initialized");
-    };
+    }
 
 
     void sendDeviceInfo() {
@@ -160,19 +161,21 @@ class FirebaseManager {
       Serial.printf("sendIOTDeviceInfo: result = %s\n", result ? "ok" : fbdo.errorReason().c_str());
     }
 
+    void sendSensorsList(int allSensors, ISensorsManager** sensManagers, int numSensManagers) {
+        String path = DB_DEVICES_IDS_TYPES + deviceMAC + DB_SENSORS_NAMES;
 
-    void sendSensorsList(String * arrStrSensorsAddr, uint8_t sensorsNumber) {
-        Serial.printf("\nFinding new sensors and sending their arddesses to the Firebase DB.\n");
-        Serial.printf("  Total actial sensors %d.\n", sensorsNumber);
-        String path = DB_DEVICES_IDS_TYPES + deviceMAC + "/" + DB_SENSOR_NAMES;
-
-        // Create new JSON Array and add to it all actual sensors
-        FirebaseJson jsonMapSensorsAddr;
-
-        for(uint8_t i = 0; i < sensorsNumber; i++) {
-          String sensorName = arrStrSensorsAddr[i];
-          jsonMapSensorsAddr.set(arrStrSensorsAddr[i], arrStrSensorsAddr[i]);
+        String* allNames = new String[allSensors];
+        int index = 0;
+        for(int iMan = 0; iMan < numSensManagers; iMan ++) {
+          ISensorsManager* sensMan = sensManagers[iMan];
+          String* names = sensMan->getActualSensorsNames();
+          int numSens = sensMan->getNumSensors();
+          for(int iSens = 0; iSens < numSens; iSens++) {
+            allNames[index++] = names[iSens];
+          }
         }
+        // Create new JSON Object and add to it all actual and old sensors
+        FirebaseJson jsonMapSensors;
 
         // Read from DB sensors list which were stored them there
         bool getJSONRes = Firebase.RTDB.getJSON(&fbdo, path);
@@ -181,68 +184,53 @@ class FirebaseManager {
         if (getJSONRes && resCode == FIREBASE_ERROR_HTTP_CODE_OK) {
           FirebaseJson *jsonMapDB = fbdo.to<FirebaseJson *>();
           size_t jsonArrDBLen = jsonMapDB->iteratorBegin();
-          Serial.printf("  Initial number of sensors in DB = %d\n", jsonArrDBLen);
 
           for (size_t iDB = 0; iDB < jsonArrDBLen; iDB++) {
             String sSensorAddrDB = jsonMapDB->valueAt(iDB).key;
-            String sSensorNameDB = jsonMapDB->valueAt(iDB).value;
-            sSensorNameDB = sSensorNameDB.substring(1, sSensorNameDB.length() - 1); // Trim leading and ending quotes
-            
-            bool isNotActualSensor = true;
-            for(uint8_t iReal = 0; iReal < sensorsNumber; iReal++) {
-              String sSensorNameReal = arrStrSensorsAddr[iReal];
-              if(sSensorNameDB.equalsIgnoreCase(sSensorNameReal)) {
-                isNotActualSensor = false;
-                break;
-              }
-            }
-            // Add sensor from DB to total sensors list
-            if(isNotActualSensor) {
-              jsonMapSensorsAddr.set(sSensorAddrDB, sSensorNameDB);
-            }
+            jsonMapSensors.set(sSensorAddrDB, false);
           }
           jsonMapDB->iteratorEnd();
         }
 
-        // The total sensors list send to DB
-        bool jsonSetResult = Firebase.RTDB.set(&fbdo, path, &jsonMapSensorsAddr);
-        Serial.printf("Set sensors names list to RTDB... %s\n", jsonSetResult ? "ok" : fbdo.errorReason().c_str());
+        for(uint8_t iReal = 0; iReal < allSensors; iReal++) {
+          String sSensorNameReal = allNames[iReal];
+          jsonMapSensors.set(sSensorNameReal, true);
+        }
+
+        delete[] allNames;
+        jsonMapSensors.toString(Serial, true);
         Serial.println();
+
+        // The total sensors list send to DB
+        bool jsonSetResult = Firebase.RTDB.set(&fbdo, path, &jsonMapSensors);
+        Serial.printf("Set sensors names list to RTDB... %s\n", jsonSetResult ? "ok" : fbdo.errorReason().c_str());
     }
 
-    void sendDS18B20SensorsDataToDB(String *arrSensorsAddr, float* arrTemperatures, uint8_t sensorsNumber)  {
-        Serial.println(" Push DS18B20 sensors new data to DB.");
-        if(sensorsNumber == 0) {
-          Serial.println(" -- No temperature sensors.");
-          return;
+    void sendSensorsDataToDB(int allSensors, ISensorsManager** sensManagers, int numSensManagers) {
+      Serial.println(" Push All sensors new data to DB.");
+      String path = DB_DEVICES_DATA + deviceMAC + DB_SENSORS_VALUES;
+
+      // Create new JSON Object and add to it all actual and old sensors
+      FirebaseJson jsonSensors;
+
+      for(int iMan = 0; iMan < numSensManagers; iMan ++) {
+        ISensorsManager* sensMan = sensManagers[iMan];
+        if(sensMan->hasLastData) {
+          int numSens = sensMan->getNumSensors();
+          String* names = sensMan->getActualSensorsNames();
+          float* values = sensMan->getActualSensorsData();
+          for(int iSens = 0; iSens < numSens; iSens++) {
+            jsonSensors.set(names[iSens], values[iSens]);
+          }
         }
-        String path = DB_DEVICES_DATA + deviceMAC + DB_DS18B20_TEMPERATURES;
-        FirebaseJson json;
-        FirebaseJson jsonTime;
-        jsonTime.set(".sv", "timestamp");
-        json.set("time", jsonTime);
+      }
 
-        for(uint8_t i = 0; i < sensorsNumber; i++) {
-          json.set(arrSensorsAddr[i], arrTemperatures[i]);
-        }
-        bool result = Firebase.RTDB.pushAsync(&fbdo, path, &json);
-        Serial.printf("  Push data to RTDB ... %s\n\n", result ? "ok" : fbdo.errorReason().c_str());
-    }
+      FirebaseJson jsonTime;
+      jsonTime.set(".sv", "timestamp");
+      jsonSensors.set("time", jsonTime);
 
-
-    void sendAM2320SensorDataToDB(float humidity, float temperature) {
-        Serial.println(" Push AM2320 sensor new data to DB.");
-        String path = DB_DEVICES_DATA + deviceMAC + DB_AM2320_VALUES;
-        FirebaseJson json;
-        FirebaseJson jsonTime;
-        jsonTime.set(".sv", "timestamp");
-        json.set("time", jsonTime);
-
-        json.set("h", humidity);
-        json.set("t", temperature);
-
-        bool result = Firebase.RTDB.pushAsync(&fbdo, path, &json);
-        Serial.printf("  Push data to RTDB ... %s\n\n", result ? "ok" : fbdo.errorReason().c_str());
+      bool result = Firebase.RTDB.pushAsync(&fbdo, path, &jsonSensors);
+      Serial.printf("  Push data to RTDB ... %s\n\n", result ? "ok" : fbdo.errorReason().c_str());
     }
 
 

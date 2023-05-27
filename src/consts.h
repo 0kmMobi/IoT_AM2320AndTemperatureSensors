@@ -8,8 +8,6 @@
   ///
   #define IOT_TYPE DS18B20_AND_AM2320_SENSORS_CONTROLLER
 
-
-
   // Pins
   #define PIN_BTN_FLASH D7            // to WebServer mode for get WiFi info
   #define PIN_LED_BUILTIN LED_BUILTIN // D4
@@ -24,8 +22,6 @@
   // Sensor Humidity and Temperature AM2320
   #define PIN_AM2320_I2C_SDA D6 // D6 // D2
   #define PIN_AM2320_I2C_SCL D1 // D5 // D1
-//   #define AM2320_I2C_FREQ 3000L
-// //  #define AM2320_MAX_ATTEMPTS_FOR_READ_DATA 10
 
   #define I2C_CLOCK_FREQ_MAX 40000
   #define I2C_CLOCK_FREQ_MIN 1000
@@ -34,7 +30,7 @@
   #define AM2320_DELAY_BETWEEN_READING_ATTEMPTS 200 // 2000
 
   // Incoming IoT parameters from FireBase stream
-  #define PARAM_NAME_DURATION "duration"
+  #define PARAM_NAME_DURATION "freq_sec" // we measure the frequency of receiving data in seconds
   #define PARAM_NAME_PING_TS "ping_ts"
   #define PARAM_NAME_PONG_TS "pong_ts"
   
@@ -65,9 +61,8 @@
   // Firebase
   #define DB_DEVICES_IDS_TYPES "/devices_list/"
   #define DB_DEVICES_DATA "/devices_data/"
-  #define DB_SENSOR_NAMES "sensor_names/"
-  #define DB_DS18B20_TEMPERATURES "/temperatures/"
-  #define DB_AM2320_VALUES "/am2320/"
+  #define DB_SENSORS_NAMES "/sensor_names/"
+  #define DB_SENSORS_VALUES "/sensors/"
 
 
 #endif /* CONSTS_H */
